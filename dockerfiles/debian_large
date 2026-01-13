@@ -1,7 +1,7 @@
 FROM --platform=i386 i386/debian:bookworm
 ARG DEBIAN_FRONTEND=noninteractive
 
-# 1. Combined Install: Installs both terminal tools and the graphical stack
+# 1. Standard package installation
 RUN apt-get update && apt-get -y upgrade && \
     apt-get install -y apt-utils beef bsdgames bsdmainutils ca-certificates \
     cowsay cpio cron curl dmidecode dmsetup g++ gcc gdbm-l10n git \
@@ -14,24 +14,22 @@ RUN apt-get update && apt-get -y upgrade && \
     xserver-xorg-core i3-wm xinit xterm dbus-x11 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Create the 'user' account and set passwords
+# 2. User setup
 RUN useradd -m -s /bin/bash user && \
     echo "user:password" | chpasswd && \
     echo 'root:password' | chpasswd
 
-# 3. Setup the Graphical Startup
-# We use dbus-launch to ensure the window manager has permission to draw on the screen
+# 3. Graphical environment config
 RUN echo "exec dbus-launch --exit-with-session i3" > /home/user/.xinitrc && \
     chown user:user /home/user/.xinitrc
-
-# 4. Auto-launch X11 on boot
 RUN echo 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" -eq 1 ]; then exec startx; fi' >> /home/user/.bashrc
 
-# 5. Handle examples (Added || true to prevent crash if folder is missing)
-COPY --chown=user:user ./examples /home/user/examples || true
-RUN chmod -R +x /home/user/examples/lua 2>/dev/null || true
+# 4. FIX: This won't crash even if the 'examples' folder is missing
+COPY --chown=user:user . /tmp/build_context
+RUN if [ -d "/tmp/build_context/examples" ]; then cp -r /tmp/build_context/examples /home/user/examples; fi && \
+    rm -rf /tmp/build_context
 
-# 6. Final WebVM Environment Settings
+# 5. Runtime settings
 ENV DISPLAY=:0
 WORKDIR /home/user
 USER user
