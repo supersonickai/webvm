@@ -1,7 +1,7 @@
 FROM --platform=i386 i386/debian:bookworm
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install essential packages AND the graphical stack
+# 1. Combined Install: Installs both terminal tools and the graphical stack
 RUN apt-get update && apt-get -y upgrade && \
     apt-get install -y apt-utils beef bsdgames bsdmainutils ca-certificates \
     cowsay cpio cron curl dmidecode dmsetup g++ gcc gdbm-l10n git \
@@ -11,23 +11,28 @@ RUN apt-get update && apt-get -y upgrade && \
     python3-six python3-yaml readline-common rsyslog ruby sensible-utils \
     ssh systemd systemd-sysv tasksel tasksel-data udev vim wget whiptail \
     xxd iptables isc-dhcp-client isc-dhcp-common kmod less netcat-openbsd \
-    xserver-xorg-core i3-wm xinit xterm dbus-x11
-    RUN apt-get update && apt-get install -y \
-    xserver-xorg-core i3-wm xinit xterm dbus-x11
+    xserver-xorg-core i3-wm xinit xterm dbus-x11 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# 2. Create the 'user' account and set passwords
+RUN useradd -m -s /bin/bash user && \
+    echo "user:password" | chpasswd && \
+    echo 'root:password' | chpasswd
 
-# Create the mandatory 'user'
-RUN useradd -m user && echo "user:password" | chpasswd && echo 'root:password' | chpasswd
+# 3. Setup the Graphical Startup
+# We use dbus-launch to ensure the window manager has permission to draw on the screen
+RUN echo "exec dbus-launch --exit-with-session i3" > /home/user/.xinitrc && \
+    chown user:user /home/user/.xinitrc
 
-# Setup the Desktop for the 'user' account
-RUN echo "exec i3" > /home/user/.xinitrc && chown user:user /home/user/.xinitrc
+# 4. Auto-launch X11 on boot
 RUN echo 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" -eq 1 ]; then exec startx; fi' >> /home/user/.bashrc
 
-# Copy over local examples
-COPY --chown=user:user ./examples /home/user/examples
-RUN chmod -R +x /home/user/examples/lua
+# 5. Handle examples (Added || true to prevent crash if folder is missing)
+COPY --chown=user:user ./examples /home/user/examples || true
+RUN chmod -R +x /home/user/examples/lua 2>/dev/null || true
 
-# Final settings
+# 6. Final WebVM Environment Settings
+ENV DISPLAY=:0
 WORKDIR /home/user
 USER user
 CMD [ "/bin/bash" ]
