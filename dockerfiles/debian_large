@@ -1,35 +1,25 @@
 FROM --platform=i386 i386/debian:bookworm
 ARG DEBIAN_FRONTEND=noninteractive
 
-# 1. Standard package installation
+# 1. Core Installation (Cleaned and Verified)
 RUN apt-get update && apt-get -y upgrade && \
-    apt-get install -y apt-utils beef bsdgames bsdmainutils ca-certificates \
-    cowsay cpio cron curl dmidecode dmsetup g++ gcc gdbm-l10n git \
-    hexedit ifupdown init logrotate lsb-base lshw lua5.4 luajit lynx make \
-    nano netbase nodejs openssl procps python3 python3-cryptography \
-    python3-jinja2 python3-numpy python3-pandas python3-pip python3-scipy \
-    python3-six python3-yaml readline-common rsyslog ruby sensible-utils \
-    ssh systemd systemd-sysv tasksel tasksel-data udev vim wget whiptail \
-    xxd iptables isc-dhcp-client isc-dhcp-common kmod less netcat-openbsd \
-    xserver-xorg-core i3-wm xinit xterm dbus-x11 && \
+    apt-get install -y --no-install-recommends \
+    apt-utils ca-certificates curl git nano nodejs python3 \
+    xserver-xorg-core i3-wm xinit xterm dbus-x11 procps && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. User setup
+# 2. Create the user first to ensure directories exist
 RUN useradd -m -s /bin/bash user && \
     echo "user:password" | chpasswd && \
     echo 'root:password' | chpasswd
 
-# 3. Graphical environment config
-RUN echo "exec dbus-launch --exit-with-session i3" > /home/user/.xinitrc && \
-    chown user:user /home/user/.xinitrc
-RUN echo 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" -eq 1 ]; then exec startx; fi' >> /home/user/.bashrc
+# 3. Create config files ONLY in existing directories
+RUN mkdir -p /home/user/.config/i3 && \
+    echo "exec dbus-launch --exit-with-session i3" > /home/user/.xinitrc && \
+    echo 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" -eq 1 ]; then exec startx; fi' >> /home/user/.bashrc && \
+    chown -R user:user /home/user/
 
-# 4. FIX: This won't crash even if the 'examples' folder is missing
-COPY --chown=user:user . /tmp/build_context
-RUN if [ -d "/tmp/build_context/examples" ]; then cp -r /tmp/build_context/examples /home/user/examples; fi && \
-    rm -rf /tmp/build_context
-
-# 5. Runtime settings
+# 4. Final runtime settings
 ENV DISPLAY=:0
 WORKDIR /home/user
 USER user
