@@ -11,6 +11,10 @@ RUN apt-get update && apt-get -y upgrade && \
 	ssh systemd systemd-sysv tasksel tasksel-data udev vim wget whiptail \
 	xxd iptables isc-dhcp-client isc-dhcp-common kmod less netcat-openbsd
 
+RUN echo "exec i3" > /root/.xinitrc && chmod +x /root/.xinitrc
+
+RUN echo 'if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" -eq 1 ]; then exec startx; fi' >> /root/.bashrc
+
 # Make a user, then copy over the /example directory
 RUN useradd -m user && echo "user:password" | chpasswd
 COPY --chown=user:user ./examples /home/user/examples
